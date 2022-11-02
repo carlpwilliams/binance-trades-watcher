@@ -1,0 +1,19 @@
+{
+  "name": "binance-orderbook-watcher",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "start": "nodemon .",
+    "start:nowatch": "node .",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "author": "CarlPWilliams",
+  "license": "ISC",
+  "dependencies": {
+    "chalk": "^4",
+    "moment": "^2.29.4",
+    "momentjs": "^2.0.0",
+    "node-binance-api": "^0.13.1"
+  }
+}
