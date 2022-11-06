@@ -11,6 +11,7 @@
   "author": "CarlPWilliams",
   "license": "ISC",
   "dependencies": {
+    "audic": "^2",
     "chalk": "^4",
     "moment": "^2.29.4",
     "momentjs": "^2.0.0",
