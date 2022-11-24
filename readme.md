@@ -15,6 +15,6 @@ You may need to install nodemon if you want the app to detect changes and automa
 `npm run start:nowatch'
 
 ## output
-| number of concurrent trade types | buy/sell (maker) | qty of trade | price | running total qty of trade type |
+Range meter | number of concurrent trade types | buy/sell (maker) | qty of trade | price | running total qty of trade type |
 
 I hope to add to this in the future, for now, happy trading.
