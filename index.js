@@ -21,10 +21,9 @@ let totalSells = 0;
 let maBuys = 0;
 let maSells = 0;
 let epochTotals = {
-    "minute": { "buy": 0, start: new Date(), "sell": 0 },
-    "5minute": { "buy": 0, start: new Date(), "sell": 0 },
-    "15minute": { "buy": 0, start: new Date(), "sell": 0 },
-    "1hr": { "buy": 0, start: new Date(), "sell": 0 }
+    "60": { "buy": 0, start: new Date(), "sell": 0 },
+    "300": { "buy": 0, start: new Date(), "sell": 0 },
+    "900": { "buy": 0, start: new Date(), "sell": 0 }
 };
 
 const timeSince = (date) => {
@@ -34,34 +33,44 @@ const timeSince = (date) => {
 
 }
 console.clear();
-binance.websockets.trades(['ETHUSDT'], (trades) => {
+
+const getEpochSummary = (seconds) => {
+    const timeString = moment(new Date()).format("hh:mm:ss ");
+    let buy = Math.ceil(epochTotals[seconds].buy);
+    let sell = Math.ceil(epochTotals[seconds].sell);
+    let buyText = boldIfLarger(buy, sell, buy);
+    let sellText = boldIfLarger(sell, buy, sell);
+
+    let epochSummary = `${seconds / 60}m -> ${chalk.green(buyText)} - ${chalk.red(sellText)}`.padEnd(60);
+
+    if (timeSince(epochTotals[seconds].start) > seconds) {
+        if (seconds == 60)
+            console.info(chalk.blue.bold(timeString.padEnd(100, '-')));
+        epochTotals[seconds] = { "buy": 0, start: new Date(), "sell": 0 };
+    }
+
+    return epochSummary;
+}
+
+const outputGrid = (trades) => {
 
     let { e: eventType, E: eventTime, s: symbol, p: price, q: quantity, m: maker, a: tradeId } = trades;
-    
     let epochSummary = ``;
-    epochSummary = epochSummary + `1m -> ${chalk.green(Math.ceil(epochTotals.minute.buy))} - ${chalk.red(Math.ceil(epochTotals.minute.sell))}`.padEnd(30)
-    if (timeSince(epochTotals.minute.start) > 60) {
-        epochTotals.minute = { "buy": 0, start: new Date(), "sell": 0 };
-    }
 
-    epochSummary = epochSummary.padEnd(45) + `5m -> ${chalk.green(Math.ceil(epochTotals['5minute'].buy))} - ${chalk.red(Math.ceil(epochTotals['5minute'].sell))}`.padEnd(30)
-    if (timeSince(epochTotals['5minute'].start) > 300) {
-        epochTotals['5minute'] = { "buy": 0, start: new Date(), "sell": 0 };
-    }
+    epochSummary = getEpochSummary(60);
 
-    epochSummary = epochSummary.padEnd(90) + `15m -> ${chalk.green(Math.ceil(epochTotals['15minute'].buy))} - ${chalk.red(Math.ceil(epochTotals['15minute'].sell))}`.padEnd(30)
-    if (timeSince(epochTotals['15minute'].start) > 900) {
-        epochTotals['15minute'] = { "buy": 0, start: new Date(), "sell": 0 };
-    }
+    epochSummary = epochSummary + getEpochSummary(300)
+
+    epochSummary = epochSummary + getEpochSummary(900)
 
     if (!maker) {
         buyValues.push(quantity);
         buyValues = buyValues.reverse().slice(0, 1000).reverse();
         totalBuys = buyValues.reduce((a, b) => parseFloat(a) + parseFloat(b), 0);
 
-        epochTotals.minute.buy = epochTotals.minute.buy + parseFloat(quantity);
-        epochTotals['5minute'].buy = epochTotals['5minute'].buy + parseFloat(quantity);
-        epochTotals['15minute'].buy = epochTotals['15minute'].buy + parseFloat(quantity);
+        epochTotals['60'].buy = epochTotals['60'].buy + parseFloat(quantity);
+        epochTotals['300'].buy = epochTotals['300'].buy + parseFloat(quantity);
+        epochTotals['900'].buy = epochTotals['900'].buy + parseFloat(quantity);
 
         buyTotal = buyTotal + parseFloat(quantity);
         maBuys = Math.ceil(totalBuys / buyValues.length);
@@ -78,9 +87,9 @@ binance.websockets.trades(['ETHUSDT'], (trades) => {
 
 
 
-        epochTotals.minute.sell = epochTotals.minute.sell + parseFloat(quantity);
-        epochTotals['5minute'].sell = epochTotals['5minute'].sell + parseFloat(quantity);
-        epochTotals['15minute'].sell = epochTotals['15minute'].sell + parseFloat(quantity);
+        epochTotals['60'].sell = epochTotals['60'].sell + parseFloat(quantity);
+        epochTotals['300'].sell = epochTotals['300'].sell + parseFloat(quantity);
+        epochTotals['900'].sell = epochTotals['900'].sell + parseFloat(quantity);
 
         sellCount = parseInt(sellCount) + 1;
         sellTotal = sellTotal + parseFloat(quantity);
@@ -95,8 +104,13 @@ binance.websockets.trades(['ETHUSDT'], (trades) => {
 
     if (maker) {
         message = chalk.red(message)
+
+        // process.stdout.write(chalk.red("o"));
     }
-    else { message = chalk.green(message); }
+    else {
+        message = chalk.green(message);
+        // process.stdout.write(chalk.green("o")); 
+    }
     if (quantity > 10) {
         message = chalk.bold(message)
     }
@@ -104,8 +118,69 @@ binance.websockets.trades(['ETHUSDT'], (trades) => {
         message = chalk.underline(message);
     }
     let output = `${message.padEnd(60)} ${epochSummary}`
-    console.info(output);
-
+    return output;
     // console.info(moment(eventTime).format('mm:ss'))
     // console.table(testTable)
+}
+
+let buys = []
+let sells = []
+let buysMA100 = 0;
+let sellsMa100 = 0;
+let count = 0;
+outputOther = (trades) => {
+
+    let { e: eventType, E: eventTime, s: symbol, p: price, q: quantity, m: maker, a: tradeId } = trades;
+
+    if (!maker) {
+        const { source, total } = addAndGetTotal(buys, quantity)
+        buys = source;
+        buysMA100 = total;
+    }
+    else {
+        const { source, total } = addAndGetTotal(sells, quantity)
+        sells = source;
+        sellsMa100 = total;
+    }
+    const buysP = (buysMA100 / (buysMA100 + sellsMa100)) * 50
+    const sellsP = 50 - buysP;
+    let range = chalk.green(numberOfLetters('o', buysP)) + chalk.red(numberOfLetters('o', sellsP));
+
+    return range;
+    //return `buys: ${chalk.green(buysMA100)} (${buys.length}) - sells: ${chalk.green(sellsMa100)} (${sells.length})`;
+    console.info(`buys: ${chalk.green(buysMA100)} (${buys.length}) - sells: ${chalk.green(sellsMa100)} (${sells.length})`)
+    // console.table(trades);
+}
+const numberOfLetters = (letter, number) => {
+    let ret = '';
+    for (i = 0; i < number; i++) {
+        ret = ret + letter;
+    }
+    return ret;
+}
+
+function setCharAt(str, index, chr) {
+    if (index > str.length - 1) return str;
+    return str.substring(0, index) + chr + str.substring(index + 1);
+}
+
+const addAndGetTotal = (source, quantity) => {
+    source.push(quantity);
+    source = source.reverse().splice(0, 100).reverse();
+    let total = source.reduce((partialSum, a) => parseFloat(partialSum) + parseFloat(a), 0);
+    if (total > 0) total = Math.round(total * 100) / 100
+    return { source, total };
+}
+
+binance.websockets.trades(['LTCUSDT'], (trades) => {
+    const gridmsg = outputGrid(trades);
+    const ma100Msg = outputOther(trades);
+    console.info(`[${ma100Msg}]      ${gridmsg}`);
 });
+
+const boldIfLarger = (firstValue, secondValue, text) => {
+    if (firstValue > secondValue) {
+        return chalk.bold.underline(text)
+    }
+    return text;
+}
